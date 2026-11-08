@@ -1,4 +1,4 @@
-# Quizzeit
+# Nexo
 
 Ein Quizsystem für GitHub Pages und Supabase. Lehrkräfte speichern und starten Quizze mit sechsstelligen Zutrittscodes; Schüler treten mit ihrem Namen bei und beantworten Multiple-Choice- oder Freitextfragen.
 

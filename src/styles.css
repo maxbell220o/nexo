@@ -29,8 +29,7 @@ a { color: inherit; text-decoration: none; }
 }
 .brand { display: flex; align-items: center; gap: 10px; font: 700 20px "Space Grotesk", sans-serif; }
 .brand-mark {
-  width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
-  color: white; background: var(--purple); font-size: 19px;
+  width: 38px; height: 38px; display: block; flex: 0 0 auto;
 }
 .topbar nav { display: flex; gap: 32px; height: 100%; align-items: center; }
 .topbar nav a { height: 100%; display: grid; place-items: center; color: var(--muted); font-size: 14px; font-weight: 600; }
@@ -174,6 +173,7 @@ h1, h2, h3, p { margin-top: 0; }
 .projector-screen { position: fixed; z-index: 1000; inset: 0; display: flex; flex-direction: column; overflow: auto; color: #fff; background: #17132f; }
 .projector-header { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 12px clamp(18px, 4vw, 56px); border-bottom: 1px solid #ffffff1c; background: #211b40; }
 .projector-brand { display: flex; align-items: center; gap: 10px; font: 700 17px "Space Grotesk", sans-serif; }
+.projector-brand .brand-mark { width: 36px; height: 36px; }
 .projector-room-code { display: flex; align-items: center; gap: 12px; }
 .projector-room-code span { color: #bcb5dc; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
 .projector-room-code strong { font: 700 24px "Space Grotesk", sans-serif; letter-spacing: .12em; }
@@ -406,7 +406,7 @@ h1, h2, h3, p { margin-top: 0; }
   .library-actions { align-items: stretch; flex-direction: column; }
   .projector-header { min-height: 64px; }
   .projector-brand { font-size: 0; }
-  .projector-brand .brand-mark { font-size: 19px; }
+  .projector-brand .brand-mark { width: 34px; height: 34px; }
   .projector-room-code { gap: 6px; }
   .projector-room-code span { font-size: 8px; }
   .projector-room-code strong { font-size: 19px; }

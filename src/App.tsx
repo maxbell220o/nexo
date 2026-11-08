@@ -30,8 +30,8 @@ function Layout({ children }: { children: React.ReactNode }) {
     <div className="app-shell">
       <header className="topbar">
         <Link className="brand" to="/">
-          <span className="brand-mark">Q</span>
-          <span>Quizzeit</span>
+          <img className="brand-mark" src={`${import.meta.env.BASE_URL}nexo-mark.svg`} alt="" />
+          <span>Nexo</span>
         </Link>
         <nav aria-label="Hauptnavigation">
           <NavLink to="/" end>Mitspielen</NavLink>
@@ -39,7 +39,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
       <main>{children}</main>
-      <footer>Ein Quizprojekt für den Unterricht</footer>
+      <footer>Nexo · Interaktive Quizze für den Unterricht</footer>
     </div>
   );
 }
@@ -822,7 +822,8 @@ function ProjectorDisplay() {
     <section className="projector-screen">
       <header className="projector-header">
         <Link className="projector-brand" to="/">
-          <span className="brand-mark">Q</span> Quizzeit
+          <img className="brand-mark" src={`${import.meta.env.BASE_URL}nexo-mark.svg`} alt="" />
+          <span>Nexo</span>
         </Link>
         <div className="projector-room-code"><span>SPIELCODE</span><strong>{code}</strong></div>
         <span className="projector-live"><i /> LIVE</span>
