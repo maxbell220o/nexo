@@ -25,6 +25,39 @@ const starterQuiz: Quiz = {
   questions: [createEmptyQuestion()],
 };
 
+const QUESTION_READING_SECONDS = 10;
+
+function useQuestionTypeIntroCountdown(readingDeadline: string | null) {
+  const deadlineMs = readingDeadline ? Date.parse(readingDeadline) : Number.NaN;
+  const introDeadline = Number.isFinite(deadlineMs)
+    ? new Date(deadlineMs - QUESTION_READING_SECONDS * 1000).toISOString()
+    : null;
+  return useCountdown(introDeadline);
+}
+
+function AnswerTypeIntro({
+  answerType,
+  secondsRemaining,
+  projector = false,
+}: {
+  answerType: "multiple-choice" | "text";
+  secondsRemaining: number;
+  projector?: boolean;
+}) {
+  const isText = answerType === "text";
+  return (
+    <section className={`answer-type-intro${projector ? " answer-type-intro-projector" : ""}`}>
+      <span className="answer-type-symbol" aria-hidden="true">{isText ? "Aa" : "✓"}</span>
+      <span className="eyebrow">Nächster Fragetyp</span>
+      <h2>{isText ? "Freitext" : "Multiple Choice"}</h2>
+      <p>{isText ? "Du gibst deine Antwort selbst ein." : "Du wählst aus mehreren Antwortmöglichkeiten."}</p>
+      <span className="answer-type-countdown" role="timer">
+        Die Frage erscheint in {secondsRemaining} {secondsRemaining === 1 ? "Sekunde" : "Sekunden"}.
+      </span>
+    </section>
+  );
+}
+
 function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
@@ -79,6 +112,7 @@ function StudentHome() {
   const [joining, setJoining] = useState(false);
   const [answering, setAnswering] = useState(false);
   const readingSecondsRemaining = useCountdown(gameState?.reading_deadline ?? null);
+  const questionTypeIntroSecondsRemaining = useQuestionTypeIntroCountdown(gameState?.reading_deadline ?? null);
   const answerSecondsRemaining = useCountdown(gameState?.deadline ?? null);
   const answerPhaseStarted = Boolean(gameState?.answer_phase_started || readingSecondsRemaining === 0);
   const answerPhaseOver = Boolean(
@@ -190,14 +224,23 @@ function StudentHome() {
           ) : (
             <>
               <p className="question-progress">Frage {gameState.current_question + 1} von {gameState.question_count}</p>
-              {!answerPhaseStarted ? (
-                <p className="question-timer" role="timer">
-                  Lies die Frage. Antworten erscheinen in {readingSecondsRemaining ?? 10} Sekunden.
-                </p>
-              ) : !answerPhaseOver && answerSecondsRemaining !== null ? (
-                <p className="question-timer" role="timer">Noch {answerSecondsRemaining} Sekunden</p>
-              ) : null}
-              <h2>{gameState.question?.prompt}</h2>
+              {questionTypeIntroSecondsRemaining !== null && questionTypeIntroSecondsRemaining > 0 ? (
+                <AnswerTypeIntro
+                  answerType={gameState.question?.answer_type ?? "multiple-choice"}
+                  secondsRemaining={questionTypeIntroSecondsRemaining}
+                />
+              ) : (
+                <>
+                  {!answerPhaseStarted ? (
+                    <p className="question-timer" role="timer">
+                      Lies die Frage. Antworten erscheinen in {readingSecondsRemaining ?? 10} Sekunden.
+                    </p>
+                  ) : !answerPhaseOver && answerSecondsRemaining !== null ? (
+                    <p className="question-timer" role="timer">Noch {answerSecondsRemaining} Sekunden</p>
+                  ) : null}
+                  <h2>{gameState.question?.prompt}</h2>
+                </>
+              )}
               {gameState.answer_revealed ? (
                 <p className={gameState.is_correct ? "answer-feedback correct" : "answer-feedback incorrect"} role="status">
                   {gameState.has_answered
@@ -659,6 +702,7 @@ function TeacherConsole({ code, email }: { code: string; email: string | undefin
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const readingSecondsRemaining = useCountdown(game?.reading_deadline ?? null);
+  const questionTypeIntroSecondsRemaining = useQuestionTypeIntroCountdown(game?.reading_deadline ?? null);
   const answerSecondsRemaining = useCountdown(game?.deadline ?? null);
   const answerPhaseStarted = Boolean(game?.answer_phase_started || readingSecondsRemaining === 0);
   const answerPhaseOver = Boolean(
@@ -769,7 +813,9 @@ function TeacherConsole({ code, email }: { code: string; email: string | undefin
                         ? "Das Scoreboard wird auf der Tafel angezeigt. Mit „Nächste Frage“ geht es weiter."
                         : "Alle Antworten sind da. Drücke „Weiter“, um das Scoreboard auf der Tafel anzuzeigen."
                       : !answerPhaseStarted
-                        ? `Lesezeit: noch ${readingSecondsRemaining ?? 10} Sekunden.`
+                        ? questionTypeIntroSecondsRemaining !== null && questionTypeIntroSecondsRemaining > 0
+                          ? `Antworttyp wird angezeigt: noch ${questionTypeIntroSecondsRemaining} Sekunden.`
+                          : `Lesezeit: noch ${readingSecondsRemaining ?? 10} Sekunden.`
                         : `Antworten eingegangen: ${game.answered_count} von ${game.players.length}. Noch ${answerSecondsRemaining ?? 30} Sekunden.`}
               </p>
             </section>
@@ -791,6 +837,7 @@ function ProjectorDisplay() {
   const [game, setGame] = useState<DisplayGameState | null>(null);
   const [error, setError] = useState("");
   const readingSecondsRemaining = useCountdown(game?.reading_deadline ?? null);
+  const questionTypeIntroSecondsRemaining = useQuestionTypeIntroCountdown(game?.reading_deadline ?? null);
   const answerSecondsRemaining = useCountdown(game?.deadline ?? null);
   const answerPhaseStarted = Boolean(game?.answer_phase_started || readingSecondsRemaining === 0);
   const answerPhaseOver = Boolean(
@@ -906,6 +953,12 @@ function ProjectorDisplay() {
           )}
           <span className="scoreboard-next-hint">Die Lehrkraft startet die nächste Frage.</span>
         </div>
+      ) : questionTypeIntroSecondsRemaining !== null && questionTypeIntroSecondsRemaining > 0 ? (
+        <AnswerTypeIntro
+          answerType={game.question?.answer_type ?? "multiple-choice"}
+          secondsRemaining={questionTypeIntroSecondsRemaining}
+          projector
+        />
       ) : (
         <div className="projector-question-layout">
           <section className="projector-question">
@@ -959,6 +1012,7 @@ function TeacherGamePanel({
 }) {
   const [copyMessage, setCopyMessage] = useState("");
   const readingSecondsRemaining = useCountdown(game.reading_deadline);
+  const questionTypeIntroSecondsRemaining = useQuestionTypeIntroCountdown(game.reading_deadline);
   const answerSecondsRemaining = useCountdown(game.deadline);
   const answerPhaseStarted = game.answer_phase_started || readingSecondsRemaining === 0;
   const answerPhaseOver = game.answer_revealed || (answerPhaseStarted && answerSecondsRemaining === 0);
@@ -1007,7 +1061,9 @@ function TeacherGamePanel({
                   ? "Scoreboard wird auf der Tafel angezeigt."
                   : `Antworten abgeschlossen · ${game.answered_count} von ${game.players.length}. Mit „Weiter“ erscheint das Scoreboard.`
                 : !answerPhaseStarted
-                  ? `Frage ${game.current_question + 1} von ${game.question_count} · Lesezeit: ${readingSecondsRemaining ?? 10} Sekunden`
+                  ? questionTypeIntroSecondsRemaining !== null && questionTypeIntroSecondsRemaining > 0
+                    ? `Frage ${game.current_question + 1} von ${game.question_count} · Antworttyp: ${questionTypeIntroSecondsRemaining} Sekunden`
+                    : `Frage ${game.current_question + 1} von ${game.question_count} · Lesezeit: ${readingSecondsRemaining ?? 10} Sekunden`
                   : `Frage ${game.current_question + 1} von ${game.question_count} · ${game.answered_count} von ${game.players.length} Antworten · noch ${answerSecondsRemaining ?? 30} Sekunden`}
         </p>
         {game.status !== "finished" && (

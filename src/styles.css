@@ -63,6 +63,11 @@ h1, h2, h3, p { margin-top: 0; }
 .game-card { align-self: center; }
 .game-card h2 { margin: 12px 0 4px; font: 700 24px "Space Grotesk", sans-serif; }
 .game-card > p { color: var(--muted); line-height: 1.6; }
+.answer-type-intro { display: grid; justify-items: center; gap: 10px; padding: 20px 8px; text-align: center; }
+.answer-type-symbol { width: 68px; height: 68px; display: grid; place-items: center; border-radius: 21px; color: #fff; background: linear-gradient(140deg, #795cff, #38c8d6); font: 700 29px "Space Grotesk", sans-serif; box-shadow: 0 10px 24px #6554d933; }
+.answer-type-intro h2 { margin: 3px 0 0; font: 700 clamp(26px, 4vw, 36px)/1.1 "Space Grotesk", sans-serif; }
+.answer-type-intro p { margin: 0; color: var(--muted); line-height: 1.6; }
+.answer-type-countdown { margin-top: 5px; color: var(--purple); font-size: 13px; font-weight: 700; }
 .question-progress { margin: 14px 0 8px; color: var(--purple); font-size: 12px; font-weight: 700; }
 .question-timer { margin: 0; color: #a04430; font-size: 13px; font-weight: 700; text-align: right; }
 .player-answer-list { display: grid; gap: 10px; margin-top: 18px; }
@@ -182,6 +187,12 @@ h1, h2, h3, p { margin-top: 0; }
 .projector-message { flex: 1; display: grid; align-content: center; justify-items: center; padding: 30px; text-align: center; }
 .projector-message h1, .projector-finished h1 { margin: 15px 0 8px; font: 700 clamp(36px, 7vw, 66px) "Space Grotesk", sans-serif; }
 .projector-message p { max-width: 600px; color: #c3bed9; line-height: 1.6; }
+.answer-type-intro-projector { flex: 1; align-content: center; gap: clamp(18px, 3vw, 30px); padding: clamp(24px, 6vw, 72px); color: #fff; }
+.answer-type-intro-projector .answer-type-symbol { width: clamp(86px, 12vw, 132px); height: clamp(86px, 12vw, 132px); border-radius: 34px; font-size: clamp(40px, 6vw, 64px); }
+.answer-type-intro-projector .eyebrow { color: #bcb0ff; font-size: clamp(13px, 1.7vw, 18px); }
+.answer-type-intro-projector h2 { font-size: clamp(42px, 8vw, 88px); }
+.answer-type-intro-projector p { color: #d1cde0; font-size: clamp(17px, 2.5vw, 26px); }
+.answer-type-intro-projector .answer-type-countdown { color: #bcb0ff; font-size: clamp(15px, 2vw, 20px); }
 .projector-spinner { width: 38px; height: 38px; border: 3px solid #ffffff32; border-top-color: #aa9cff; border-radius: 50%; animation: projector-spin .9s linear infinite; }
 @keyframes projector-spin { to { transform: rotate(360deg); } }
 .projector-lobby { width: min(1500px, 100%); flex: 1; display: grid; grid-template-columns: 1.4fr .8fr; align-items: center; gap: clamp(25px, 6vw, 90px); margin: 0 auto; padding: clamp(28px, 6vw, 80px); }

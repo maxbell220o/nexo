@@ -153,9 +153,9 @@ begin
     from public.quiz_answers
     where game_id = v_game.id and question_index = v_game.current_question;
     v_answer_revealed :=
-      clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '10 seconds'
+      clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '15 seconds'
       and (
-        clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '10 seconds'
+        clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '15 seconds'
           + (public.quiz_question_time_limit(v_game.id, v_game.current_question) * interval '1 second')
         or (v_player_count > 0 and v_answered_count >= v_player_count)
       );
@@ -219,9 +219,9 @@ begin
   from public.quiz_answers
   where game_id = v_game.id and question_index = v_game.current_question;
   v_answer_revealed := v_game.status = 'question' and (
-    clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '10 seconds'
+    clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '15 seconds'
     and (
-      clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '10 seconds'
+      clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '15 seconds'
         + (public.quiz_question_time_limit(v_game.id, v_game.current_question) * interval '1 second')
       or (v_player_count > 0 and v_answered_count >= v_player_count)
     )
@@ -232,11 +232,11 @@ begin
     'status', g.status,
     'current_question', g.current_question,
     'question_count', jsonb_array_length(q.questions),
-    'reading_deadline', case when g.status = 'question' then g.question_started_at + interval '10 seconds' else null end,
-    'deadline', case when g.status = 'question' then g.question_started_at + interval '10 seconds'
+    'reading_deadline', case when g.status = 'question' then g.question_started_at + interval '15 seconds' else null end,
+    'deadline', case when g.status = 'question' then g.question_started_at + interval '15 seconds'
       + (public.quiz_question_time_limit(g.id, g.current_question) * interval '1 second') else null end,
     'answer_phase_started', g.status = 'question'
-      and clock_timestamp() >= g.question_started_at + interval '10 seconds',
+      and clock_timestamp() >= g.question_started_at + interval '15 seconds',
     'answer_revealed', v_answer_revealed,
     'scoreboard_revealed', g.scoreboard_revealed,
     'answered_count', v_answered_count,
@@ -279,9 +279,9 @@ begin
   from public.quiz_answers
   where game_id = v_game.id and question_index = v_game.current_question;
   v_answer_revealed := v_game.status = 'question' and (
-    clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '10 seconds'
+    clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '15 seconds'
     and (
-      clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '10 seconds'
+      clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '15 seconds'
         + (public.quiz_question_time_limit(v_game.id, v_game.current_question) * interval '1 second')
       or (v_player_count > 0 and v_answered_count >= v_player_count)
     )
@@ -293,11 +293,11 @@ begin
     'status', g.status,
     'current_question', g.current_question,
     'question_count', jsonb_array_length(q.questions),
-    'reading_deadline', case when g.status = 'question' then g.question_started_at + interval '10 seconds' else null end,
-    'deadline', case when g.status = 'question' then g.question_started_at + interval '10 seconds'
+    'reading_deadline', case when g.status = 'question' then g.question_started_at + interval '15 seconds' else null end,
+    'deadline', case when g.status = 'question' then g.question_started_at + interval '15 seconds'
       + (public.quiz_question_time_limit(g.id, g.current_question) * interval '1 second') else null end,
     'answer_phase_started', g.status = 'question'
-      and clock_timestamp() >= g.question_started_at + interval '10 seconds',
+      and clock_timestamp() >= g.question_started_at + interval '15 seconds',
     'answer_revealed', v_answer_revealed,
     'scoreboard_revealed', g.scoreboard_revealed,
     'answered_count', v_answered_count,
@@ -320,7 +320,7 @@ begin
         'answers', case
           when coalesce(q.questions -> g.current_question ->> 'answerType', 'multiple-choice') = 'text'
             then case when v_answer_revealed then q.questions -> g.current_question -> 'answers' else '[]'::jsonb end
-          when clock_timestamp() >= g.question_started_at + interval '10 seconds'
+          when clock_timestamp() >= g.question_started_at + interval '15 seconds'
             then q.questions -> g.current_question -> 'answers'
           else '[]'::jsonb
         end
@@ -418,10 +418,10 @@ begin
   from public.quiz_answers
   where game_id = v_game.id and question_index = v_game.current_question;
   v_answer_phase_started := v_game.status = 'question'
-    and clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '10 seconds';
+    and clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '15 seconds';
   v_answer_revealed := v_game.status = 'finished' or (v_game.status = 'question' and (
     v_answer_phase_started and (
-      clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '10 seconds'
+      clock_timestamp() >= coalesce(v_game.question_started_at, clock_timestamp()) + interval '15 seconds'
         + (v_time_limit * interval '1 second')
       or (v_player_count > 0 and v_answered_count >= v_player_count)
     )
@@ -432,8 +432,8 @@ begin
     'status', v_game.status,
     'current_question', v_game.current_question,
     'question_count', jsonb_array_length(v_quiz.questions),
-    'reading_deadline', case when v_game.status = 'question' then v_game.question_started_at + interval '10 seconds' else null end,
-    'deadline', case when v_game.status = 'question' then v_game.question_started_at + interval '10 seconds'
+    'reading_deadline', case when v_game.status = 'question' then v_game.question_started_at + interval '15 seconds' else null end,
+    'deadline', case when v_game.status = 'question' then v_game.question_started_at + interval '15 seconds'
       + (v_time_limit * interval '1 second') else null end,
     'answer_phase_started', v_answer_phase_started,
     'answer_revealed', v_answer_revealed,
@@ -516,7 +516,7 @@ begin
     raise exception 'Diese Frage erwartet eine Texteingabe.';
   end if;
   v_time_limit := coalesce((v_question ->> 'timeLimitSeconds')::integer, 30);
-  v_answer_started_at := v_game.question_started_at + interval '10 seconds';
+  v_answer_started_at := v_game.question_started_at + interval '15 seconds';
   if jsonb_typeof(v_question -> 'correctAnswers') = 'array' then
     v_correct_answers := v_question -> 'correctAnswers';
   else
@@ -649,7 +649,7 @@ begin
   end if;
 
   v_time_limit := public.quiz_question_time_limit(v_game.id, v_game.current_question);
-  v_answer_started_at := v_game.question_started_at + interval '10 seconds';
+  v_answer_started_at := v_game.question_started_at + interval '15 seconds';
   if clock_timestamp() < v_answer_started_at then
     raise exception 'Bitte lies zuerst die Frage. Die Texteingabe erscheint gleich.';
   end if;
