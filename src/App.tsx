@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import {
@@ -24,6 +25,43 @@ const starterQuiz: Quiz = {
   title: "Mein erstes Quiz",
   questions: [createEmptyQuestion()],
 };
+
+interface PopupConfig {
+  markdown: string;
+  buttonLabel: string | null;
+}
+
+type PopupLoadState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "loaded"; popup: PopupConfig }
+  | { status: "empty" }
+  | { status: "dismissed" };
+
+function parsePopupFile(source: string): PopupConfig | null {
+  const trimmed = source.trim();
+  if (!trimmed) return null;
+
+  if (!trimmed.startsWith("<popup>") || !trimmed.endsWith("</popup>")) {
+    throw new Error("Die Datei muss mit <popup> beginnen und mit </popup> enden.");
+  }
+
+  const content = trimmed.slice("<popup>".length, -"</popup>".length).trim();
+  const buttonMatches = [...content.matchAll(/<Button<([^<>]+)>>/g)];
+  if (buttonMatches.length > 1) {
+    throw new Error("In popup.md ist nur ein <Button<Text>> erlaubt.");
+  }
+
+  const buttonLabel = buttonMatches[0]?.[1].trim() ?? null;
+  if (buttonMatches.length && !buttonLabel) {
+    throw new Error("Der Popup-Button braucht einen Text, zum Beispiel <Button<ok>>.");
+  }
+
+  const markdown = content.replace(/<Button<([^<>]+)>>/g, "").trim();
+  if (!markdown) return null;
+
+  return { markdown, buttonLabel };
+}
 
 const QUESTION_READING_SECONDS = 10;
 
@@ -55,6 +93,72 @@ function AnswerTypeIntro({
         Die Frage erscheint in {secondsRemaining} {secondsRemaining === 1 ? "Sekunde" : "Sekunden"}.
       </span>
     </section>
+  );
+}
+
+function PopupOverlay({
+  popup,
+  onDismiss,
+  error,
+}: {
+  popup?: PopupConfig;
+  onDismiss?: () => void;
+  error?: string;
+}) {
+  const dialogRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+
+  function keepFocusInDialog(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Tab") return;
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusable?.length) {
+      event.preventDefault();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  return (
+    <div className="popup-backdrop">
+      <section
+        className="popup-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mitteilung"
+        tabIndex={-1}
+        ref={dialogRef}
+        onKeyDown={keepFocusInDialog}
+      >
+        {error ? (
+          <p className="auth-error" role="alert">{error}</p>
+        ) : popup ? (
+          <>
+            <div className="popup-markdown">
+              <ReactMarkdown>{popup.markdown}</ReactMarkdown>
+            </div>
+            {popup.buttonLabel && onDismiss && (
+              <button className="button button-primary popup-dismiss" onClick={onDismiss}>
+                {popup.buttonLabel}
+              </button>
+            )}
+          </>
+        ) : null}
+      </section>
+    </div>
   );
 }
 
@@ -1687,14 +1791,50 @@ function NotFound() {
 }
 
 export default function App() {
+  const [popupState, setPopupState] = useState<PopupLoadState>({ status: "loading" });
+
+  useEffect(() => {
+    let active = true;
+    async function loadPopup() {
+      try {
+        const response = await fetch(`${import.meta.env.BASE_URL}popup.md`, { cache: "no-cache" });
+        if (!response.ok) {
+          throw new Error(`popup.md konnte nicht geladen werden (HTTP ${response.status}).`);
+        }
+        const popup = parsePopupFile(await response.text());
+        if (active) {
+          setPopupState(popup ? { status: "loaded", popup } : { status: "empty" });
+        }
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "popup.md konnte nicht geladen werden.";
+        if (active) setPopupState({ status: "error", message });
+      }
+    }
+
+    void loadPopup();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<StudentHome />} />
-        <Route path="/tafel/:code" element={<ProjectorDisplay />} />
-        <Route path="/lehrer/*" element={<TeacherPage />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </Layout>
+    <>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<StudentHome />} />
+          <Route path="/tafel/:code" element={<ProjectorDisplay />} />
+          <Route path="/lehrer/*" element={<TeacherPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Layout>
+      {popupState.status === "loading" ? null : popupState.status === "error" ? (
+        <PopupOverlay error={`Fehler in public/popup.md: ${popupState.message}`} />
+      ) : popupState.status === "loaded" ? (
+        <PopupOverlay
+          popup={popupState.popup}
+          onDismiss={() => setPopupState({ status: "dismissed" })}
+        />
+      ) : null}
+    </>
   );
 }

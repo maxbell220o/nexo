@@ -9,6 +9,28 @@ npm install
 npm run dev
 ```
 
+## Start-Popup bearbeiten
+
+Die Datei `public/popup.md` steuert ein Popup, das app-weit beim Öffnen angezeigt wird – auch wenn jemand direkt einen Lehrer- oder Tafel-Link aufruft. Ist die Datei leer oder enthält sie innerhalb der Tags keinen Text, wird kein Popup angezeigt. Der Inhalt zwischen `<popup>` und `</popup>` wird als Markdown gerendert. Mit `<Button<ok>>` wird ein Button zum Schließen des Popups angezeigt; den Text `ok` kannst du ändern. Ohne einen solchen Button bleibt das Popup offen und blockiert die App.
+
+Beispiel:
+
+```md
+<popup>
+<Button<ok>>
+
+## Willkommen!
+
+Hier kannst du **Markdown** verwenden:
+- Listen
+- *kursiven* und **fetten** Text
+- [Links](https://example.com)
+
+</popup>
+```
+
+Nach Änderungen lokal mit `npm run dev` prüfen. Für GitHub Pages `npm run build` ausführen und den aktualisierten Ordner `docs/` veröffentlichen.
+
 ## Quizdateien
 
 Im [Lehrerbereich](/lehrer) lassen sich Quizze erstellen, als JSON herunterladen und wieder hochladen. Das JSON-Format ist:

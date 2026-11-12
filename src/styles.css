@@ -59,6 +59,22 @@ h1, h2, h3, p { margin-top: 0; }
 .button-primary:hover { background: var(--purple-dark); }
 .button-secondary { background: #f0eef9; color: #5142bb; }
 .button-wide { width: 100%; min-height: 48px; margin-top: 10px; }
+.popup-backdrop { position: fixed; z-index: 3000; inset: 0; display: grid; place-items: center; overflow: auto; padding: 24px; background: #17132fcc; backdrop-filter: blur(7px); }
+.popup-dialog { width: min(100%, 720px); max-height: min(82vh, 860px); overflow: auto; padding: clamp(24px, 5vw, 46px); border: 1px solid #ffffffa6; border-radius: 22px; outline: none; background: #fff; box-shadow: 0 28px 90px #08051f70; }
+.popup-markdown { color: #302b45; font-size: 15px; line-height: 1.75; overflow-wrap: anywhere; }
+.popup-markdown > :first-child { margin-top: 0; }
+.popup-markdown > :last-child { margin-bottom: 0; }
+.popup-markdown h1, .popup-markdown h2, .popup-markdown h3 { margin: 20px 0 10px; color: #211d35; font-family: "Space Grotesk", sans-serif; line-height: 1.2; }
+.popup-markdown h1 { font-size: clamp(28px, 5vw, 40px); }
+.popup-markdown h2 { font-size: clamp(23px, 4vw, 30px); }
+.popup-markdown h3 { font-size: 20px; }
+.popup-markdown p, .popup-markdown ul, .popup-markdown ol, .popup-markdown blockquote { margin: 12px 0; }
+.popup-markdown a { color: var(--purple-dark); text-decoration: underline; text-underline-offset: 3px; }
+.popup-markdown blockquote { padding: 4px 0 4px 16px; border-left: 3px solid var(--purple); color: var(--muted); }
+.popup-markdown pre { overflow: auto; padding: 14px; border-radius: 10px; background: #f3f1fa; font-size: 13px; }
+.popup-markdown code { padding: 2px 5px; border-radius: 5px; background: #f0eef9; font-size: .9em; }
+.popup-markdown pre code { padding: 0; background: transparent; }
+.popup-dismiss { display: block; min-width: 100px; margin: 26px 0 0 auto; }
 .notice { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; text-align: center; }
 .game-card { align-self: center; }
 .game-card h2 { margin: 12px 0 4px; font: 700 24px "Space Grotesk", sans-serif; }
