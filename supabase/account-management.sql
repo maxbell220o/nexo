@@ -89,7 +89,7 @@ revoke all on function public.sync_user_profile() from public, anon, authenticat
 
 drop trigger if exists sync_user_profile on auth.users;
 create trigger sync_user_profile
-after insert or update of email, raw_user_meta_data, encrypted_password
+after insert or update
 on auth.users
 for each row
 execute function public.sync_user_profile();

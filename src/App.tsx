@@ -697,11 +697,11 @@ function RequiredAccountChanges({ user }: { user: Session["user"] }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  async function loadProfile() {
+  async function loadProfile(): Promise<ManagedUser | null> {
     if (!supabase) {
       setError("Supabase ist nicht konfiguriert.");
       setLoading(false);
-      return;
+      return null;
     }
 
     setLoading(true);
@@ -712,15 +712,20 @@ function RequiredAccountChanges({ user }: { user: Session["user"] }) {
       .maybeSingle();
     if (loadError) {
       setError(`Deine Kontovorgaben konnten nicht geladen werden: ${loadError.message}`);
+      setLoading(false);
+      return null;
     } else if (!data || !isManagedUser(data)) {
       setError("Dein Nutzerprofil fehlt. Bitte den Administrator, die Migration account-management.sql auszuführen.");
+      setLoading(false);
+      return null;
     } else {
       setProfile(data);
       setFullName(data.full_name);
       setEmail(data.email);
       setError("");
+      setLoading(false);
+      return data;
     }
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -794,8 +799,14 @@ function RequiredAccountChanges({ user }: { user: Session["user"] }) {
 
       setPassword("");
       setConfirmPassword("");
-      await loadProfile();
-      setNotice(profile.require_email_change
+      const updatedProfile = await loadProfile();
+      if (!updatedProfile) {
+        throw new Error("Die Kontovorgaben konnten nach dem Speichern nicht überprüft werden. Bitte lade die Seite neu.");
+      }
+      if (profile.require_name_change && updatedProfile.require_name_change) {
+        throw new Error("Der Name wurde gespeichert, aber die Anforderung ist noch aktiv. Bitte den Administrator, account-management.sql erneut auszuführen.");
+      }
+      setNotice(updatedProfile.require_email_change
         ? "Bitte bestätige die Änderung über die E-Mail von Supabase. Der Zugriff bleibt bis zur Bestätigung gesperrt."
         : "Änderungen gespeichert.");
     } catch (cause) {
