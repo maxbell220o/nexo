@@ -529,14 +529,399 @@ function validateQuiz(quiz: Quiz): string | null {
   return null;
 }
 
+interface ManagedUser {
+  id: string;
+  email: string;
+  full_name: string;
+  require_name_change: boolean;
+  require_email_change: boolean;
+  require_password_change: boolean;
+}
+
+type RequirementField =
+  | "require_name_change"
+  | "require_email_change"
+  | "require_password_change";
+
+function isManagedUser(value: unknown): value is ManagedUser {
+  if (typeof value !== "object" || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.id === "string"
+    && typeof row.email === "string"
+    && typeof row.full_name === "string"
+    && typeof row.require_name_change === "boolean"
+    && typeof row.require_email_change === "boolean"
+    && typeof row.require_password_change === "boolean";
+}
+
+function AdminUserManagement() {
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    async function loadUsers() {
+      if (!supabase) {
+        setError("Supabase ist nicht konfiguriert.");
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: loadError } = await supabase
+        .from("user_profiles")
+        .select("id,email,full_name,require_name_change,require_email_change,require_password_change")
+        .order("email");
+      if (!active) return;
+      if (loadError) {
+        setError(`Nutzerliste konnte nicht geladen werden: ${loadError.message}`);
+      } else if (!Array.isArray(data) || !data.every(isManagedUser)) {
+        setError("Supabase hat Nutzerdaten in einem unerwarteten Format zurückgegeben.");
+      } else {
+        setUsers(data);
+        setError("");
+      }
+      setLoading(false);
+    }
+
+    void loadUsers();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function updateRequirement(userId: string, field: RequirementField, enabled: boolean) {
+    if (!supabase) {
+      setError("Supabase ist nicht konfiguriert.");
+      return;
+    }
+    setSavingUserId(userId);
+    setError("");
+    const update = field === "require_name_change"
+      ? { require_name_change: enabled }
+      : field === "require_email_change"
+        ? { require_email_change: enabled }
+        : { require_password_change: enabled };
+    const { data: updatedUser, error: updateError } = await supabase
+      .from("user_profiles")
+      .update(update)
+      .eq("id", userId)
+      .select("id")
+      .single();
+
+    if (updateError) {
+      setError(`Änderung für Nutzer ${userId} konnte nicht gespeichert werden: ${updateError.message}`);
+    } else if (updatedUser.id !== userId) {
+      setError(`Die Änderung für Nutzer ${userId} wurde nicht bestätigt.`);
+    } else {
+      setUsers((current) => current.map((user) =>
+        user.id === userId ? { ...user, [field]: enabled } : user,
+      ));
+    }
+    setSavingUserId(null);
+  }
+
+  return (
+    <section className="dashboard-section admin-users">
+      <div className="section-title-row">
+        <div>
+          <span className="eyebrow">Administration</span>
+          <h2>Alle Nutzer</h2>
+        </div>
+      </div>
+      {error && <p className="auth-error" role="alert">{error}</p>}
+      {loading ? (
+        <p className="auth-loading" role="status">Nutzer werden geladen ...</p>
+      ) : (
+        <div className="panel admin-users-table-wrap">
+          <table className="admin-users-table">
+            <thead>
+              <tr>
+                <th scope="col">User-ID</th>
+                <th scope="col">E-Mail</th>
+                <th scope="col">Vollständiger Name</th>
+                <th scope="col">Name ändern</th>
+                <th scope="col">E-Mail ändern</th>
+                <th scope="col">Passwort ändern</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td className="admin-user-id">{user.id}</td>
+                  <td>{user.email}</td>
+                  <td>{user.full_name || "—"}</td>
+                  {([
+                    ["require_name_change", "Name ändern lassen"],
+                    ["require_email_change", "E-Mail ändern lassen"],
+                    ["require_password_change", "Passwort ändern lassen"],
+                  ] as const).map(([field, label]) => (
+                    <td key={field} className="admin-user-toggle">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={user[field]}
+                          disabled={savingUserId !== null}
+                          aria-label={`${label}: ${user.email}`}
+                          onChange={(event) => void updateRequirement(user.id, field, event.target.checked)}
+                        />
+                      </label>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {users.length === 0 && (
+                <tr><td colSpan={6}>Es sind noch keine Nutzer vorhanden.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="notice">Aktivierte Anforderungen werden beim nächsten Anmelden erzwungen.</p>
+    </section>
+  );
+}
+
+function RequiredAccountChanges({ user }: { user: Session["user"] }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const [profile, setProfile] = useState<ManagedUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [fullName, setFullName] = useState(
+    typeof user.user_metadata.full_name === "string" ? user.user_metadata.full_name : "",
+  );
+  const [email, setEmail] = useState(user.email ?? "");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  async function loadProfile() {
+    if (!supabase) {
+      setError("Supabase ist nicht konfiguriert.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const { data, error: loadError } = await supabase
+      .from("user_profiles")
+      .select("id,email,full_name,require_name_change,require_email_change,require_password_change")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (loadError) {
+      setError(`Deine Kontovorgaben konnten nicht geladen werden: ${loadError.message}`);
+    } else if (!data || !isManagedUser(data)) {
+      setError("Dein Nutzerprofil fehlt. Bitte den Administrator, die Migration account-management.sql auszuführen.");
+    } else {
+      setProfile(data);
+      setFullName(data.full_name);
+      setEmail(data.email);
+      setError("");
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    void loadProfile();
+  }, [user.id]);
+
+  useEffect(() => {
+    const firstField = dialogRef.current?.querySelector<HTMLElement>("input, button");
+    (firstField ?? dialogRef.current)?.focus();
+  }, []);
+
+  function keepFocusInDialog(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Tab") return;
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'input:not(:disabled), button:not(:disabled)',
+    );
+    if (!focusable?.length) {
+      event.preventDefault();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  async function submitChanges(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!profile || !supabase) return;
+
+    const nextName = fullName.trim();
+    const nextEmail = email.trim();
+    if (profile.require_name_change && nextName === profile.full_name.trim()) {
+      setError("Bitte ändere deinen vollständigen Namen.");
+      return;
+    }
+    if (profile.require_email_change && nextEmail.toLocaleLowerCase("en-US") === user.email?.toLocaleLowerCase("en-US")) {
+      setError("Bitte gib eine andere E-Mail-Adresse ein.");
+      return;
+    }
+    if (profile.require_password_change && password.length < 8) {
+      setError("Dein neues Passwort muss mindestens 8 Zeichen lang sein.");
+      return;
+    }
+    if (profile.require_password_change && password !== confirmPassword) {
+      setError("Die beiden Passwörter stimmen nicht überein.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+    const updates: {
+      data?: { full_name: string };
+      email?: string;
+      password?: string;
+    } = {};
+    if (profile.require_name_change) updates.data = { full_name: nextName };
+    if (profile.require_email_change) updates.email = nextEmail;
+    if (profile.require_password_change) updates.password = password;
+
+    try {
+      const { error: updateError } = await supabase.auth.updateUser(updates);
+      if (updateError) throw updateError;
+
+      setPassword("");
+      setConfirmPassword("");
+      await loadProfile();
+      setNotice(profile.require_email_change
+        ? "Bitte bestätige die Änderung über die E-Mail von Supabase. Der Zugriff bleibt bis zur Bestätigung gesperrt."
+        : "Änderungen gespeichert.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Deine Änderungen konnten nicht gespeichert werden.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const hasRequirements = Boolean(
+    profile?.require_name_change || profile?.require_email_change || profile?.require_password_change,
+  );
+
+  if (!loading && !error && !hasRequirements) return null;
+
+  return (
+    <div className="popup-backdrop account-requirement-backdrop">
+      <section
+        className="popup-dialog account-requirement-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="account-requirements-title"
+        tabIndex={-1}
+        ref={dialogRef}
+        onKeyDown={keepFocusInDialog}
+      >
+        {loading ? (
+          <p role="status">Kontovorgaben werden geladen ...</p>
+        ) : error && !profile ? (
+          <>
+            <h2 id="account-requirements-title">Kontozugriff nicht möglich</h2>
+            <p className="auth-error" role="alert">{error}</p>
+            <button className="button button-secondary" onClick={() => void loadProfile()}>Erneut versuchen</button>
+          </>
+        ) : profile && hasRequirements ? (
+          <form className="required-account-form" onSubmit={(event) => void submitChanges(event)}>
+            <span className="eyebrow">Aktion erforderlich</span>
+            <h2 id="account-requirements-title">Bitte aktualisiere dein Konto</h2>
+            <p>Dein Administrator verlangt eine Änderung. Du kannst erst fortfahren, wenn alle angeforderten Angaben aktualisiert sind.</p>
+            {profile.require_name_change && (
+              <label>
+                Vollständiger Name
+                <input
+                  type="text"
+                  autoComplete="name"
+                  maxLength={100}
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  required
+                />
+              </label>
+            )}
+            {profile.require_email_change && (
+              <label>
+                Neue E-Mail-Adresse
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </label>
+            )}
+            {profile.require_password_change && (
+              <>
+                <label>
+                  Neues Passwort
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Neues Passwort wiederholen
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    required
+                  />
+                </label>
+              </>
+            )}
+            {error && <p className="auth-error" role="alert">{error}</p>}
+            {notice && <p className="form-message" role="status">{notice}</p>}
+            <button className="button button-primary popup-dismiss" type="submit" disabled={saving}>
+              {saving ? "Speichert ..." : "Änderungen speichern"}
+            </button>
+            {profile.require_email_change && notice && (
+              <button className="button button-secondary popup-dismiss" type="button" onClick={() => void loadProfile()}>
+                E-Mail bestätigt? Status aktualisieren
+              </button>
+            )}
+          </form>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
 function TeacherDashboard({
-  email,
+  user,
+  isAdmin,
   onSignOut,
 }: {
-  email: string | undefined;
+  user: Session["user"];
+  isAdmin: boolean;
   onSignOut: () => void;
 }) {
   const navigate = useNavigate();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountName, setAccountName] = useState(
+    typeof user.user_metadata.full_name === "string" ? user.user_metadata.full_name : "",
+  );
+  const [accountEmail, setAccountEmail] = useState(user.email ?? "");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [accountSaving, setAccountSaving] = useState(false);
+  const [accountError, setAccountError] = useState("");
+  const [accountNotice, setAccountNotice] = useState("");
   const [quizzes, setQuizzes] = useState<SavedQuiz[]>([]);
   const [game, setGame] = useState<TeacherGameState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -544,6 +929,57 @@ function TeacherDashboard({
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  async function handleAccountUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const fullName = accountName.trim();
+    const email = accountEmail.trim();
+    const emailChanged = email.toLocaleLowerCase("en-US") !== (user.email ?? "").toLocaleLowerCase("en-US");
+
+    setAccountError("");
+    setAccountNotice("");
+    if (!fullName) {
+      setAccountError("Bitte gib deinen vollständigen Namen ein.");
+      return;
+    }
+    if (newPassword && newPassword.length < 8) {
+      setAccountError("Das neue Passwort muss mindestens 8 Zeichen lang sein.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setAccountError("Die beiden Passwörter stimmen nicht überein.");
+      return;
+    }
+    if (!supabase) {
+      setAccountError("Supabase ist nicht konfiguriert. Änderungen sind derzeit nicht möglich.");
+      return;
+    }
+
+    setAccountSaving(true);
+    const updates: {
+      data: { full_name: string };
+      email?: string;
+      password?: string;
+    } = { data: { full_name: fullName } };
+    if (emailChanged) updates.email = email;
+    if (newPassword) updates.password = newPassword;
+
+    try {
+      const { error: updateError } = await supabase.auth.updateUser(updates);
+      if (updateError) throw updateError;
+
+      setAccountName(fullName);
+      setNewPassword("");
+      setConfirmPassword("");
+      setAccountNotice(emailChanged
+        ? "Profil gespeichert. Bitte bestätige die neue E-Mail-Adresse über die Nachricht von Supabase."
+        : "Deine Kontodaten wurden gespeichert.");
+    } catch (cause) {
+      setAccountError(cause instanceof Error ? cause.message : "Kontodaten konnten nicht gespeichert werden.");
+    } finally {
+      setAccountSaving(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -644,7 +1080,19 @@ function TeacherDashboard({
         <div className="dashboard-hero-top">
           <span className="dashboard-greeting">Lehrerbereich</span>
           <div className="dashboard-account">
-            <span>{email}</span>
+            <span>{user.email}</span>
+            <button
+              className="dashboard-signout"
+              onClick={() => {
+                setAccountOpen((open) => !open);
+                setAccountError("");
+                setAccountNotice("");
+              }}
+              aria-expanded={accountOpen}
+              aria-controls="account-settings"
+            >
+              {accountOpen ? "Einstellungen schließen" : "Konto"}
+            </button>
             <button className="dashboard-signout" onClick={onSignOut}>Abmelden</button>
           </div>
         </div>
@@ -667,6 +1115,68 @@ function TeacherDashboard({
           <div><strong>{game ? game.players.length : "—"}</strong><span>Teilnehmende im aktuellen Spiel</span></div>
         </div>
       </div>
+
+      {accountOpen && (
+        <form id="account-settings" className="panel account-settings" onSubmit={(event) => void handleAccountUpdate(event)}>
+          <div className="account-settings-heading">
+            <div>
+              <span className="eyebrow">Persönliche Daten</span>
+              <h2>Kontoeinstellungen</h2>
+            </div>
+          </div>
+          <div className="account-settings-fields">
+            <label>
+              Vollständiger Name
+              <input
+                type="text"
+                name="full-name"
+                autoComplete="name"
+                maxLength={100}
+                value={accountName}
+                onChange={(event) => setAccountName(event.target.value)}
+                required
+              />
+            </label>
+            <label>
+              E-Mail-Adresse
+              <input
+                type="email"
+                name="email"
+                autoComplete="email"
+                value={accountEmail}
+                onChange={(event) => setAccountEmail(event.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Neues Passwort <span className="account-field-hint">(leer lassen, wenn es gleich bleiben soll)</span>
+              <input
+                type="password"
+                name="new-password"
+                autoComplete="new-password"
+                minLength={8}
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+              />
+            </label>
+            <label>
+              Neues Passwort wiederholen
+              <input
+                type="password"
+                name="confirm-password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+              />
+            </label>
+          </div>
+          {accountError && <p className="auth-error" role="alert">{accountError}</p>}
+          {accountNotice && <p className="form-message" role="status">{accountNotice}</p>}
+          <button className="button button-primary" type="submit" disabled={accountSaving}>
+            {accountSaving ? "Speichert ..." : "Änderungen speichern"}
+          </button>
+        </form>
+      )}
 
       {(error || notice) && (
         <p className={error ? "auth-error dashboard-message" : "form-message dashboard-message"} role={error ? "alert" : "status"}>
@@ -731,6 +1241,8 @@ function TeacherDashboard({
           </div>
         </section>
       )}
+
+      {isAdmin && <AdminUserManagement />}
 
       <section className="dashboard-section">
         <div className="section-title-row">
@@ -1764,21 +2276,23 @@ function TeacherPage() {
     );
   }
 
-  if (location.pathname.replace(/\/+$/, "").endsWith("/editor")) {
-    return (
-      <TeacherEditor
-        authError={authError}
-        ownerId={session.user.id}
-      />
-    );
-  }
-
   const consoleMatch = location.pathname.match(/\/lehrer\/konsole\/(\d{6})\/?$/);
+  const isAdmin = session.user.app_metadata.role === "admin";
+  let page: React.ReactNode;
   if (consoleMatch) {
-    return <TeacherConsole code={consoleMatch[1]} email={session.user.email} />;
+    page = <TeacherConsole code={consoleMatch[1]} email={session.user.email} />;
+  } else if (location.pathname.replace(/\/+$/, "").endsWith("/editor")) {
+    page = <TeacherEditor authError={authError} ownerId={session.user.id} />;
+  } else {
+    page = <TeacherDashboard user={session.user} isAdmin={isAdmin} onSignOut={signOut} />;
   }
 
-  return <TeacherDashboard email={session.user.email} onSignOut={signOut} />;
+  return (
+    <>
+      {page}
+      <RequiredAccountChanges user={session.user} />
+    </>
+  );
 }
 
 function NotFound() {
